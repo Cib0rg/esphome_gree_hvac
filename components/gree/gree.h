@@ -11,17 +11,17 @@ namespace gree {
 // enum SwingMode : uint8_t { SWING_OFF = 0, SWING_VERTICAL = 1, SWING_HORIZONTAL = 2, SWING_BOTH = 3 };
 
 enum ac_mode: uint8_t {
-  AC_MODE_OFF = 0x10,
+  AC_MODE_OFF = 0x00,
   // auto 0-1-2-3
-  AC_MODE_AUTO = 0x80,
+  AC_MODE_AUTO = 0x00,
   // cool 0-1-2-3
-  AC_MODE_COOL = 0x90,
+  AC_MODE_COOL = 0x10,
   // dry 1 (only) but set it to AUTO (0) for setting it to 1 later
-  AC_MODE_DRY = 0xA0,
+  AC_MODE_DRY = 0x20,
   // fanonly 0-1-2-3
-  AC_MODE_FANONLY = 0xB0,
+  AC_MODE_FANONLY = 0x30,
   // heat 0-1-2-3
-  AC_MODE_HEAT = 0xC0
+  AC_MODE_HEAT = 0x40
 };
 
 enum ac_fan: uint8_t {

@@ -13,8 +13,8 @@ static const char *const TAG = "gree";
 // It will be much much easier to work with structures instead of array and byte positions
 static const uint8_t FORCE_UPDATE = 7;
 static const uint8_t MODE = 8;
-static const uint8_t MODE_MASK = 0b11110000;
-static const uint8_t FAN_MASK = 0b00001111;
+static const uint8_t MODE_MASK = 0b01110000;
+static const uint8_t FAN_MASK = 0b00000111;
 static const uint8_t SWING = 12;
 
 static const uint8_t CRC_WRITE = 46;
@@ -130,7 +130,7 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
   }
 
 // now we are using only packets with 0x31 as first data byte
-  if (data[3] != 49) {
+  if (data[3] != 0x31) {
     ESP_LOGW(TAG, "Invalid packet type.");
     return;
   }
@@ -144,10 +144,8 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
   data_write_[TEMPERATURE] = data[TEMPERATURE];
 
   // update CLIMATE state according AC response
+  if (data[MODE] & 0x80) {
   switch (data[MODE] & MODE_MASK) {
-    case AC_MODE_OFF:
-      this->mode = climate::CLIMATE_MODE_OFF;
-      break;
     case AC_MODE_AUTO:
       this->mode = climate::CLIMATE_MODE_AUTO;
       break;
@@ -164,7 +162,10 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
       this->mode = climate::CLIMATE_MODE_HEAT;
       break;
     default:
-      ESP_LOGW(TAG, "Unknown AC MODE&fan: %s", data[MODE]);
+        ESP_LOGW(TAG, "Unknown AC MODE: %02x", data[MODE] & MODE_MASK);
+    }
+  } else {
+    this->mode = climate::CLIMATE_MODE_OFF;
   }
 
   // get current AC FAN SPEED from its response
@@ -182,7 +183,7 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
       this->fan_mode = climate::CLIMATE_FAN_HIGH;
       break;
     default:
-      ESP_LOGW(TAG, "Unknown AC mode&FAN: %s", data[MODE]);
+      ESP_LOGW(TAG, "Unknown AC FAN: %02x", data[MODE] & FAN_MASK);
   }
 
   /*
@@ -220,10 +221,13 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
   }
 
   this->publish_state();
+  if (data[41] & 0x80) {
+    ESP_LOGV(TAG, "ir_cmd %u", data[41]);
+  }
 }
 
 void GreeClimate::control(const climate::ClimateCall &call) {
-  data_write_[FORCE_UPDATE] = 175;
+  data_write_[FORCE_UPDATE] = 0xAF;
   // show current temperature on display every time when sending new command. TEST!
   data_write_[13] = 0x20;
   
@@ -238,7 +242,7 @@ void GreeClimate::control(const climate::ClimateCall &call) {
 */
 
   // saving mode&fan values from previous 
-  uint8_t new_mode = data_write_[MODE] & MODE_MASK;
+  uint8_t new_mode = data_write_[MODE] & (MODE_MASK | 0x80);
   uint8_t new_fan_speed = data_write_[MODE] & FAN_MASK;
 
   if (call.get_mode().has_value()) {
@@ -247,20 +251,20 @@ void GreeClimate::control(const climate::ClimateCall &call) {
         new_mode = AC_MODE_OFF;
         break;
       case climate::CLIMATE_MODE_AUTO:
-        new_mode = AC_MODE_AUTO;
+        new_mode = AC_MODE_AUTO | 0x80;
         break;
       case climate::CLIMATE_MODE_COOL:
-        new_mode = AC_MODE_COOL;
+        new_mode = AC_MODE_COOL | 0x80;
         break;
       case climate::CLIMATE_MODE_DRY:
-        new_mode = AC_MODE_DRY;
+        new_mode = AC_MODE_DRY | 0x80;
         new_fan_speed = AC_FAN_LOW;
         break;
       case climate::CLIMATE_MODE_FAN_ONLY:
-        new_mode = AC_MODE_FANONLY;
+        new_mode = AC_MODE_FANONLY | 0x80;
         break;
       case climate::CLIMATE_MODE_HEAT:
-        new_mode = AC_MODE_HEAT;
+        new_mode = AC_MODE_HEAT | 0x80;
         break;
       default:
         ESP_LOGW(TAG, "Setting of unsupported MODE: %s", call.get_mode().value());
